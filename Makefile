@@ -4,5 +4,5 @@ LDFLAGS = -lhttp_parser -lpion -lboost_system -llog4cpp -lcrypto
 
 all: http-parser-bench
 
-http-parser-bench: http-parser-bench.cc
+http-parser-bench: http-parser-bench.cc Makefile
 	$(CC) $(CFLAGS) $(LDFLAGS) $< -o $@
