@@ -130,6 +130,8 @@ HTTPRequest::parse(const StringView& text) {
     settings.on_header_value = HTTPRequest::on_header_value;
     settings.on_headers_complete = HTTPRequest::on_headers_complete;
 
+    http_parser_execute(&parser, &settings, text.data(), text.size());
+
     return request;
 }
 
