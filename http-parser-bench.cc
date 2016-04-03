@@ -12,6 +12,23 @@ using StringView = gsl::span<const char>;
 
 // Разобрать нужно в такую структуру; если нужны преобразования, это недостаток.
 class HTTPRequest {
+public:
+    const StringView& get_uri() const {
+        return _uri;
+    }
+
+    const StringView& get_host() const {
+        return _host;
+    }
+
+    const StringView& get_user_agent() const {
+        return _user_agent;
+    }
+
+    const StringView& get_accept() const {
+        return _accept;
+    }
+
 protected:
     StringView _uri;
     StringView _host;
@@ -21,7 +38,7 @@ protected:
 
 namespace http_parser_bench {
 
-class HTTPRequest : private ::HTTPRequest {
+class HTTPRequest : public ::HTTPRequest {
 public:
     static HTTPRequest parse(const StringView& text);
 
@@ -52,7 +69,7 @@ private:
 
 namespace pion_bench {
 
-class HTTPRequest : private ::HTTPRequest {
+class HTTPRequest : public ::HTTPRequest {
 public:
     static HTTPRequest parse(const StringView& text);
 
@@ -64,6 +81,34 @@ private:
 };
 
 }  // namespace pion_bench
+
+template<class Request> void benchmark(const std::string& caption);
+
+int
+main() {
+    benchmark<http_parser_bench::HTTPRequest>("http_parser");
+    benchmark<pion_bench::HTTPRequest>("pion");
+}
+
+static const char REQUEST[] =
+        "GET /w/cpp/chrono/duration HTTP/1.1\r\n"
+        "Host: en.cppreference.com\r\n"
+        "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:45.0) Gecko/20100101 Firefox/45.0\r\n"
+        "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\n"
+        "Accept-Language: en,ru-RU;q=0.8,ru;q=0.5,en-US;q=0.3\r\n"
+        "Accept-Encoding: gzip, deflate\r\n"
+        "Referer: http://en.cppreference.com/mwiki/index.php?title=Special%3ASearch&search=duration\r\n"
+        "Cookie: __utma=165123437.262467405.1456259269.1457796545.1459620610.13; __utmz=165123437.1456259269.1.1.utmcsr=(direct)|utmccn=(direct)|utmcmd=(none); __utmb=165123437.2.10.1459620610; __utmc=165123437; __utmt=1\r\n"
+        "Connection: keep-alive\r\n"
+        "Cache-Control: max-age=0\r\n"
+        "\r\n";
+
+template<size_t N>
+static inline bool
+equals(const StringView& view, const char (&string)[N]) {
+    const size_t size = N - 1;
+    return (view.size() == size) && (std::strncmp(view.data(), string, size) == 0);
+}
 
 template<class Code>
 std::chrono::nanoseconds
@@ -89,28 +134,16 @@ benchmark(Code&& code) {
 template<class Request>
 void
 benchmark(const std::string& caption) {
-    const char REQUEST[] =
-            "GET /w/cpp/chrono/duration HTTP/1.1\r\n"
-            "Host: en.cppreference.com\r\n"
-            "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:45.0) Gecko/20100101 Firefox/45.0\r\n"
-            "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\n"
-            "Accept-Language: en,ru-RU;q=0.8,ru;q=0.5,en-US;q=0.3\r\n"
-            "Accept-Encoding: gzip, deflate\r\n"
-            "Referer: http://en.cppreference.com/mwiki/index.php?title=Special%3ASearch&search=duration\r\n"
-            "Cookie: __utma=165123437.262467405.1456259269.1457796545.1459620610.13; __utmz=165123437.1456259269.1.1.utmcsr=(direct)|utmccn=(direct)|utmcmd=(none); __utmb=165123437.2.10.1459620610; __utmc=165123437; __utmt=1\r\n"
-            "Connection: keep-alive\r\n"
-            "Cache-Control: max-age=0\r\n"
-            "\r\n";
-    auto result = benchmark([&REQUEST](){
+    auto request = Request::parse(REQUEST);
+    assert(equals(request.get_uri(), "/w/cpp/chrono/duration"));
+    assert(equals(request.get_host(), "en.cppreference.com"));
+    assert(equals(request.get_user_agent(), "Mozilla/5.0 (X11; Linux x86_64; rv:45.0) Gecko/20100101 Firefox/45.0"));
+    assert(equals(request.get_accept(), "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"));
+
+    auto result = benchmark([]{
         Request::parse(REQUEST);
     });
     std::cout << caption << ": " << result.count() << "ns" << std::endl;
-}
-
-int
-main() {
-    benchmark<http_parser_bench::HTTPRequest>("http_parser");
-    benchmark<pion_bench::HTTPRequest>("pion");
 }
 
 namespace http_parser_bench {
@@ -140,12 +173,6 @@ HTTPRequest::on_url(http_parser* parser, const char *at, size_t length) {
     HTTPRequest& request = *reinterpret_cast<HTTPRequest*>(parser->data);
     request._uri = gsl::as_span(at, length);
     return CONTINUE;
-}
-
-template<size_t N>
-static inline bool
-equals(const StringView& view, const char (&string)[N]) {
-    return std::strncmp(view.data(), string, N - 1) == 0;
 }
 
 int
