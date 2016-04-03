@@ -57,10 +57,10 @@ private:
         ITEM_COUNT
     };
 
-    static int on_url(http_parser* parser, const char *at, size_t length);
-    static int on_header_field(http_parser* parser, const char *at, size_t length);
-    static int on_header_value(http_parser* parser, const char *at, size_t length);
-    static int on_headers_complete(http_parser* parser);
+    static inline int on_url(http_parser* parser, const char *at, size_t length);
+    static inline int on_header_field(http_parser* parser, const char *at, size_t length);
+    static inline int on_header_value(http_parser* parser, const char *at, size_t length);
+    static inline int on_headers_complete(http_parser* parser);
 
     Item _current_item = ITEM_NOTHING;
 };
@@ -111,7 +111,7 @@ equals(const StringView& view, const char (&string)[N]) {
 }
 
 template<class Code>
-std::chrono::nanoseconds
+static inline std::chrono::nanoseconds
 benchmark(Code&& code) {
     using Clock = std::chrono::high_resolution_clock;
 
@@ -119,8 +119,7 @@ benchmark(Code&& code) {
     constexpr size_t COUNT = 1000;
 
     std::chrono::nanoseconds total{0};
-    for (size_t i = 0; i < RUNS; ++i)
-    {
+    for (size_t i = 0; i < RUNS; ++i) {
         auto start = Clock::now();
         for (size_t j = 0; j < COUNT; ++j) {
             code();
@@ -168,14 +167,14 @@ HTTPRequest::parse(const StringView& text) {
     return request;
 }
 
-int
+inline int
 HTTPRequest::on_url(http_parser* parser, const char *at, size_t length) {
     HTTPRequest& request = *reinterpret_cast<HTTPRequest*>(parser->data);
     request._uri = gsl::as_span(at, length);
     return CONTINUE;
 }
 
-int
+inline int
 HTTPRequest::on_header_field(http_parser* parser, const char *at, size_t length) {
     HTTPRequest& request = *reinterpret_cast<HTTPRequest*>(parser->data);
     const StringView header = gsl::as_span(at, length);
@@ -191,7 +190,7 @@ HTTPRequest::on_header_field(http_parser* parser, const char *at, size_t length)
     return CONTINUE;
 }
 
-int
+inline int
 HTTPRequest::on_header_value(http_parser* parser, const char *at, size_t length) {
     HTTPRequest& request = *reinterpret_cast<HTTPRequest*>(parser->data);
     if (request._current_item == ITEM_NOTHING) {
@@ -217,7 +216,7 @@ HTTPRequest::on_header_value(http_parser* parser, const char *at, size_t length)
     return CONTINUE;
 }
 
-int
+inline int
 HTTPRequest::on_headers_complete(http_parser* parser) {
     return STOP;
 }
